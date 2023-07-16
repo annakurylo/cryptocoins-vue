@@ -246,14 +246,6 @@ export default {
         this.subscribeOnUpdatesOfTickers(ticker.name);
       });
     }
-    // this.tickers = JSON.parse(localStorage.getItem("tickers"));
-    // if (this.tickers) {
-    //   for (let i = 0; i < this.tickers.length; i++) {
-    //     this.subscribeOnUpdatesOfTickers(this.tickers[i].name);
-    //   }
-    // } else this.tickers = [];
-
-    // console.log(this.tickers);
 
     axios
       .get(`https://min-api.cryptocompare.com/data/all/coinlist?summary=true`)
