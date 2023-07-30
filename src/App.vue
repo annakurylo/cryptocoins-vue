@@ -45,13 +45,48 @@
       </div>
     </div>
 
+    <div class="filters">
+      <div class="content">
+        <div class="lineBlock"></div>
+        <div class="filters__content">
+          <div class="filters__search">
+            <div class="filters__search-title">Поиск тикера</div>
+            <div class="filters__search-area">
+              <input
+                v-model="filter"
+                type="text"
+                class="filters__search-input"
+                placeholder="Например DOGE"
+              />
+            </div>
+          </div>
+          <div class="filters__pagination">
+            <button
+              class="filters__pagination-btn"
+              @click="prevPage"
+              :disabled="page <= 1"
+            >
+              Назад
+            </button>
+            <button
+              class="filters__pagination-btn"
+              @click="nextPage"
+              :disabled="page >= pageCount"
+            >
+              Вперед
+            </button>
+          </div>
+        </div>
+        <div class="lineBlock"></div>
+      </div>
+    </div>
+
     <div class="info">
       <div class="content">
-        <template v-if="tickers.length">
-          <div class="lineBlock"></div>
+        <template v-if="tickers.length && paginateTickers.length">
           <div class="ticketInfo-list">
             <div
-              v-for="ticker in tickers"
+              v-for="ticker in paginateTickers"
               :key="ticker.price"
               class="ticketInfo-itemOfList"
               @click="addGraph(ticker)"
@@ -122,6 +157,9 @@ export default {
       graphPrice: [],
       coinList: [],
       inputTickerError: [],
+      filter: "",
+      size: 6,
+      page: 1,
       add: mdiPlus,
       delete_: mdiTrashCan,
       close: mdiWindowClose,
@@ -131,6 +169,20 @@ export default {
     ticker() {
       this.validateTicker(this.ticker.toUpperCase());
     },
+    filter() {
+      this.page = 1;
+
+      let url = new URL(window.location.href);
+      url.searchParams.set("filter", `${this.filter}`);
+      url.searchParams.set("page", `${this.page}`);
+      history.pushState(null, null, url.href);
+    },
+    page() {
+      let url = new URL(window.location.href);
+      url.searchParams.set("filter", `${this.filter}`);
+      url.searchParams.set("page", `${this.page}`);
+      history.pushState(null, null, url.href);
+    },
   },
   computed: {
     filterArrOfCoinList() {
@@ -138,9 +190,32 @@ export default {
         .filter((coin) => coin.includes(this.ticker.toUpperCase()))
         .slice(0, 4);
     },
+
+    filterTickers() {
+      return this.tickers.filter((ticker) =>
+        ticker.name.includes(this.filter.toUpperCase())
+      );
+    },
+
+    paginateTickers() {
+      let start = (this.page - 1) * this.size;
+      let end = start + this.size;
+      console.log(this.filterTickers);
+      return this.filterTickers.slice(start, end);
+    },
+
+    pageCount() {
+      return Math.ceil(this.filterTickers.length / this.size);
+    },
   },
 
   methods: {
+    prevPage() {
+      this.page--;
+    },
+    nextPage() {
+      this.page++;
+    },
     validateTicker(name) {
       this.inputTickerError = [];
       if (this.tickers.find((t) => t.name === name)) {
@@ -164,7 +239,7 @@ export default {
     subscribeOnUpdatesOfTickers(tickerName) {
       setInterval(async () => {
         const response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&extraParams=cryptoApp`
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=c96718b4c204953b6dd304ddbebbaa9c9398ec61b0c530a25d5a1ac4237e9563`
         );
         let dataCryptoPrice = await response.json();
 
@@ -178,7 +253,7 @@ export default {
         if (this.select?.name === tickerName) {
           this.graphPrice.push(dataCryptoPrice.USD);
         }
-      }, 5000);
+      }, 500000);
     },
     localStorageSetTickers() {
       localStorage.setItem(
@@ -194,6 +269,8 @@ export default {
       );
     },
     getTicker(name) {
+      this.filter = "";
+
       let newTicker = {
         name: name,
         price: "-",
@@ -247,8 +324,23 @@ export default {
       });
     }
 
+    let url = new URL(window.location.href);
+    let params = new URLSearchParams(url.search);
+
+    for (const [key, value] of params.entries()) {
+      if (key === "filter" && value) {
+        console.log(typeof value);
+        this.filter = value;
+      }
+      if (key === "page") this.page = value;
+    }
+
+    console.log(this.filter + " i " + this.page);
+
     axios
-      .get(`https://min-api.cryptocompare.com/data/all/coinlist?summary=true`)
+      .get(
+        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true&api_key=c96718b4c204953b6dd304ddbebbaa9c9398ec61b0c530a25d5a1ac4237e9563`
+      )
       .then((response) => {
         this.coinList = Object.keys(response.data.Data);
       });
@@ -328,6 +420,70 @@ export default {
 }
 .stButton-text {
   margin: 0 0 0 5px;
+}
+
+.filters {
+  margin: 25px 0 0 0;
+
+  &__content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__search {
+    padding: 35px 0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+
+    &-title {
+      font-weight: 700;
+    }
+
+    &-area {
+    }
+
+    &-input {
+      padding: 10px 15px;
+      box-shadow: 0 0 0 0.1rem rgba(158, 158, 158, 0.25);
+      border: none;
+      min-width: 200px;
+      outline: none;
+    }
+    &-input:focus {
+      box-shadow: none;
+      border: 2px solid rgb(76, 79, 90);
+    }
+  }
+
+  &__pagination {
+    display: flex;
+    gap: 5px;
+
+    &-btn {
+      border-radius: 5px;
+      padding: 5px 15px;
+      color: rgb(38, 42, 58);
+      background-color: rgb(228, 224, 224);
+      border: none;
+      box-shadow: 0 0 0 0.1rem rgba(158, 158, 158, 0.25);
+    }
+
+    &-btn:hover {
+      box-shadow: 1px 1px 1px 1px rgb(96, 96, 96);
+      background-color: rgb(213, 210, 210);
+    }
+
+    &-btn:disabled {
+      color: rgba(38, 42, 58, 0.408);
+      background-color: rgba(228, 224, 224, 0.403);
+    }
+
+    &-btn:hover:disabled {
+      box-shadow: 0 0 0 0.1rem rgba(158, 158, 158, 0.25);
+    }
+  }
 }
 
 .info {
