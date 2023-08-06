@@ -13,11 +13,11 @@
               @keyup.enter="addTicker(ticker)"
             />
             <div
-              v-if="filterArrOfCoinList.length && ticker"
+              v-if="filteredArrOfCoinList.length && ticker"
               class="searchTicker-hints"
             >
               <div
-                v-for="(coin, idx) in filterArrOfCoinList"
+                v-for="(coin, idx) in filteredArrOfCoinList"
                 :key="idx"
                 @click="addTicker(coin)"
               >
@@ -83,10 +83,10 @@
 
     <div class="info">
       <div class="content">
-        <template v-if="tickers.length && paginateTickers.length">
+        <template v-if="tickers.length && paginatedTickers.length">
           <div class="ticketInfo-list">
             <div
-              v-for="ticker in paginateTickers"
+              v-for="ticker in paginatedTickers"
               :key="ticker.price"
               class="ticketInfo-itemOfList"
               @click="addGraph(ticker)"
@@ -126,7 +126,7 @@
             <div class="horizontalBlock"></div>
             <div class="space">
               <div
-                v-for="(price, indx) in normalizeGraph()"
+                v-for="(price, indx) in normalizedGraph"
                 :key="indx"
                 class="diagramBlock"
                 :style="{ height: price + '%' }"
@@ -140,6 +140,10 @@
 </template>
 
 <script>
+//избавление от ЗАВИСИМЫХ ДАННЫХ
+//рефакторинг watch: избавление от одинакого кода в filter() i page(), работа с массивами
+//исправление ошибок: при удалении всех тикеров на n странице -> вернутся на n-1 страницу
+
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
 import axios from "axios";
@@ -171,41 +175,75 @@ export default {
     },
     filter() {
       this.page = 1;
-
+    },
+    getFilterAndPageOptions(v) {
       let url = new URL(window.location.href);
-      url.searchParams.set("filter", `${this.filter}`);
-      url.searchParams.set("page", `${this.page}`);
+      url.searchParams.set("filter", `${v.filter}`);
+      url.searchParams.set("page", `${v.page}`);
       history.pushState(null, null, url.href);
     },
-    page() {
-      let url = new URL(window.location.href);
-      url.searchParams.set("filter", `${this.filter}`);
-      url.searchParams.set("page", `${this.page}`);
-      history.pushState(null, null, url.href);
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page--;
+      }
+    },
+    tickers: {
+      handler() {
+        localStorage.setItem(
+          "tickers",
+          JSON.stringify(
+            this.tickers.map((ticker) => {
+              return {
+                name: ticker.name,
+                price: "-",
+              };
+            })
+          )
+        );
+
+        if (!this.tickers.length) {
+          localStorage.removeItem("tickers");
+        }
+      },
+      deep: true,
     },
   },
   computed: {
-    filterArrOfCoinList() {
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graphPrice);
+      const minValue = Math.min(...this.graphPrice);
+
+      return this.graphPrice.map((p) => {
+        return maxValue === minValue
+          ? 50
+          : 5 + ((p - minValue) * 95) / (maxValue - minValue);
+      });
+    },
+    filteredArrOfCoinList() {
       return this.coinList
         .filter((coin) => coin.includes(this.ticker.toUpperCase()))
         .slice(0, 4);
     },
 
-    filterTickers() {
+    filteredTickers() {
       return this.tickers.filter((ticker) =>
         ticker.name.includes(this.filter.toUpperCase())
       );
     },
 
-    paginateTickers() {
-      let start = (this.page - 1) * this.size;
-      let end = start + this.size;
-      console.log(this.filterTickers);
-      return this.filterTickers.slice(start, end);
+    paginatedTickers() {
+      const start = (this.page - 1) * this.size;
+      const end = start + this.size;
+      return this.filteredTickers.slice(start, end);
     },
-
     pageCount() {
-      return Math.ceil(this.filterTickers.length / this.size);
+      return Math.ceil(this.filteredTickers.length / this.size);
+    },
+    getFilterAndPageOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
     },
   },
 
@@ -236,6 +274,19 @@ export default {
         this.getTicker(name);
       }
     },
+    getTicker(name) {
+      this.filter = "";
+
+      let newTicker = {
+        name: name,
+        price: "-",
+      };
+      this.tickers.push(newTicker);
+
+      this.subscribeOnUpdatesOfTickers(newTicker.name);
+
+      this.ticker = "";
+    },
     subscribeOnUpdatesOfTickers(tickerName) {
       setInterval(async () => {
         const response = await fetch(
@@ -243,8 +294,8 @@ export default {
         );
         let dataCryptoPrice = await response.json();
 
-        if (this.tickers.find((t) => t.name === tickerName)) {
-          this.tickers.find((t) => t.name === tickerName).price =
+        if (this.findTickerByName(tickerName)) {
+          this.findTickerByName(tickerName).price =
             dataCryptoPrice.USD > 1
               ? dataCryptoPrice.USD.toFixed(2)
               : dataCryptoPrice.USD.toPrecision(2);
@@ -255,32 +306,8 @@ export default {
         }
       }, 500000);
     },
-    localStorageSetTickers() {
-      localStorage.setItem(
-        "tickers",
-        JSON.stringify(
-          this.tickers.map((ticker) => {
-            return {
-              name: ticker.name,
-              price: "-",
-            };
-          })
-        )
-      );
-    },
-    getTicker(name) {
-      this.filter = "";
-
-      let newTicker = {
-        name: name,
-        price: "-",
-      };
-      this.tickers.push(newTicker);
-
-      this.localStorageSetTickers();
-      this.subscribeOnUpdatesOfTickers(newTicker.name);
-
-      this.ticker = "";
+    findTickerByName(name) {
+      return this.tickers.find((t) => t.name === name);
     },
     deleteTicker(ticker) {
       this.tickers = this.tickers.filter(
@@ -291,27 +318,13 @@ export default {
         this.select = null;
         this.graphPrice = [];
       }
-
-      this.tickers.length > 0
-        ? this.localStorageSetTickers()
-        : localStorage.removeItem("tickers");
-    },
-    deleteGraph() {
-      this.select = null;
-    },
-    normalizeGraph() {
-      let maxValue = Math.max(...this.graphPrice);
-      console.log(maxValue);
-      let minValue = Math.min(...this.graphPrice);
-      console.log(minValue);
-
-      return this.graphPrice.map(
-        (p) => 5 + ((p - minValue) * 95) / (maxValue - minValue)
-      );
     },
     addGraph(ticker) {
       this.select = ticker;
       this.graphPrice = [];
+    },
+    deleteGraph() {
+      this.select = null;
     },
   },
 
@@ -329,13 +342,10 @@ export default {
 
     for (const [key, value] of params.entries()) {
       if (key === "filter" && value) {
-        console.log(typeof value);
         this.filter = value;
       }
       if (key === "page") this.page = value;
     }
-
-    console.log(this.filter + " i " + this.page);
 
     axios
       .get(
