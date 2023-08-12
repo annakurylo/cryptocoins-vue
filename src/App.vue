@@ -97,7 +97,9 @@
               <div class="ticketInfo-itemOfList__name">
                 {{ ticker.name }} - USD
               </div>
-              <div class="ticketInfo-itemOfList__price">{{ ticker.price }}</div>
+              <div class="ticketInfo-itemOfList__price">
+                {{ formatPriceOfTicker(ticker.price) }}
+              </div>
               <div>
                 <button
                   class="ticketInfo-itemOfList__button-delete"
@@ -147,6 +149,9 @@
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
 import axios from "axios";
+
+import { getPricesOfTickers } from "./app";
+
 export default {
   name: "my-component",
   components: {
@@ -283,28 +288,34 @@ export default {
       };
       this.tickers.push(newTicker);
 
-      this.subscribeOnUpdatesOfTickers(newTicker.name);
+      this.subscribeOnUpdatesOfTickers(name);
 
       this.ticker = "";
     },
+    async getUpdatedPricesOfTickers() {
+      const tickerNames = this.tickers.map((ticker) => ticker.name);
+      let updatedPrices = await getPricesOfTickers(tickerNames);
+      this.tickers.forEach((ticker) =>
+        ticker.name in updatedPrices
+          ? (ticker.price = updatedPrices[ticker.name])
+          : ticker.price
+      );
+    },
     subscribeOnUpdatesOfTickers(tickerName) {
       setInterval(async () => {
-        const response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=c96718b4c204953b6dd304ddbebbaa9c9398ec61b0c530a25d5a1ac4237e9563`
-        );
-        let dataCryptoPrice = await response.json();
-
-        if (this.findTickerByName(tickerName)) {
-          this.findTickerByName(tickerName).price =
-            dataCryptoPrice.USD > 1
-              ? dataCryptoPrice.USD.toFixed(2)
-              : dataCryptoPrice.USD.toPrecision(2);
-        }
+        await this.getUpdatedPricesOfTickers();
 
         if (this.select?.name === tickerName) {
-          this.graphPrice.push(dataCryptoPrice.USD);
+          this.graphPrice.push(this.findTickerByName(tickerName).price);
         }
-      }, 500000);
+      }, 100000000);
+    },
+    formatPriceOfTicker(price) {
+      return price === "-"
+        ? price
+        : price > 1
+        ? price.toFixed(2)
+        : price.toPrecision(2);
     },
     findTickerByName(name) {
       return this.tickers.find((t) => t.name === name);
