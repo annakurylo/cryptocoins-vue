@@ -150,9 +150,9 @@
 
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
-import axios from "axios";
+//import axios from "axios";
 
-import { getPricesOfTickers } from "./app";
+import { getPricesOfTickers, getCoinlist } from "./app";
 
 export default {
   name: "my-component",
@@ -332,7 +332,7 @@ export default {
     },
   },
 
-  created() {
+  async created() {
     const cryptoData = localStorage.getItem("tickers");
     if (cryptoData) {
       this.tickers = JSON.parse(cryptoData);
@@ -354,13 +354,7 @@ export default {
       if (key === "page") this.page = value;
     }
 
-    axios
-      .get(
-        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true&api_key=c96718b4c204953b6dd304ddbebbaa9c9398ec61b0c530a25d5a1ac4237e9563`
-      )
-      .then((response) => {
-        this.coinList = Object.keys(response.data.Data);
-      });
+    this.coinList = await getCoinlist();
   },
 };
 </script>
