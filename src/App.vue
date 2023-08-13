@@ -146,6 +146,8 @@
 //рефакторинг watch: избавление от одинакого кода в filter() i page(), работа с массивами
 //исправление ошибок: при удалении всех тикеров на n странице -> вернутся на n-1 страницу
 
+//исправление API запроса: теперь на сервер мы отпраляем один запрос в created, логика запроса вынесена в api.js
+
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
 import axios from "axios";
@@ -288,11 +290,10 @@ export default {
       };
       this.tickers.push(newTicker);
 
-      this.subscribeOnUpdatesOfTickers(name);
-
       this.ticker = "";
     },
     async getUpdatedPricesOfTickers() {
+      if (!this.tickers.length) return;
       const tickerNames = this.tickers.map((ticker) => ticker.name);
       let updatedPrices = await getPricesOfTickers(tickerNames);
       this.tickers.forEach((ticker) =>
@@ -300,15 +301,6 @@ export default {
           ? (ticker.price = updatedPrices[ticker.name])
           : ticker.price
       );
-    },
-    subscribeOnUpdatesOfTickers(tickerName) {
-      setInterval(async () => {
-        await this.getUpdatedPricesOfTickers();
-
-        if (this.select?.name === tickerName) {
-          this.graphPrice.push(this.findTickerByName(tickerName).price);
-        }
-      }, 100000000);
     },
     formatPriceOfTicker(price) {
       return price === "-"
@@ -336,6 +328,7 @@ export default {
     },
     deleteGraph() {
       this.select = null;
+      this.graphPrice = [];
     },
   },
 
@@ -343,10 +336,13 @@ export default {
     const cryptoData = localStorage.getItem("tickers");
     if (cryptoData) {
       this.tickers = JSON.parse(cryptoData);
-      this.tickers.forEach((ticker) => {
-        this.subscribeOnUpdatesOfTickers(ticker.name);
-      });
     }
+    setInterval(async () => {
+      await this.getUpdatedPricesOfTickers();
+      if (this.select && this.select.price !== "-") {
+        this.graphPrice.push(this.select.price);
+      }
+    }, 5000);
 
     let url = new URL(window.location.href);
     let params = new URLSearchParams(url.search);
@@ -396,7 +392,6 @@ export default {
   outline: none;
 }
 .searchTicker-input:focus {
-  //box-shadow: 1px 1px 2px 0 rgb(38, 42, 58);
   border: 2px solid rgb(76, 79, 90);
 }
 .searchTicker-content {
@@ -599,11 +594,9 @@ export default {
   background-color: rgb(38, 42, 58);
 }
 .diagramBlock {
-  //height: 80%;
   width: 30px;
   background-color: rgb(213, 210, 210);
   align-self: end;
-  //position: absolute;
 }
 .diagramBlock:not(last-child) {
   margin: 0 1px 0 0;
