@@ -86,12 +86,12 @@
         <template v-if="tickers.length && paginatedTickers.length">
           <div class="ticketInfo-list">
             <div
-              v-for="ticker in paginatedTickers"
-              :key="ticker.price"
+              v-for="ticker in tickers"
+              :key="ticker.name"
               class="ticketInfo-itemOfList"
               @click="addGraph(ticker)"
               :class="{
-                tickerBorder: this.select === ticker,
+                tickerBorder: this.select?.name === ticker.name,
               }"
             >
               <div class="ticketInfo-itemOfList__name">
@@ -150,9 +150,9 @@
 
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
-//import axios from "axios";
 
-import { getPricesOfTickers, getCoinlist } from "./app";
+//import { loadtPricesOfTickers, getCoinlist, subcribeOnUpdates } from "./app";
+import { subcribeOnUpdates, getCoinlist, unsubcribeFromUpdates } from "./app";
 
 export default {
   name: "my-component",
@@ -290,18 +290,29 @@ export default {
       };
       this.tickers.push(newTicker);
 
+      subcribeOnUpdates(newTicker.name, (name, price) => {
+        this.getUpdatedPricesOfTickers(name, price);
+      });
+
       this.ticker = "";
     },
-    async getUpdatedPricesOfTickers() {
-      if (!this.tickers.length) return;
-      const tickerNames = this.tickers.map((ticker) => ticker.name);
-      let updatedPrices = await getPricesOfTickers(tickerNames);
-      this.tickers.forEach((ticker) =>
-        ticker.name in updatedPrices
-          ? (ticker.price = updatedPrices[ticker.name])
-          : ticker.price
-      );
+    getUpdatedPricesOfTickers(tickerName, newPrice) {
+      this.tickers = this.tickers.map((ticker) => {
+        if (ticker.name === tickerName) {
+          return { name: ticker.name, price: newPrice };
+        }
+        return ticker;
+      });
+
+      if (
+        this.select &&
+        this.select.name === tickerName &&
+        this.select.price !== "-"
+      ) {
+        this.graphPrice.push(newPrice);
+      }
     },
+
     formatPriceOfTicker(price) {
       return price === "-"
         ? price
@@ -317,7 +328,9 @@ export default {
         (itemOfTickers) => itemOfTickers !== ticker
       );
 
-      if (this.select === ticker) {
+      unsubcribeFromUpdates(ticker.name);
+
+      if (this.select?.name === ticker.name) {
         this.select = null;
         this.graphPrice = [];
       }
@@ -336,13 +349,13 @@ export default {
     const cryptoData = localStorage.getItem("tickers");
     if (cryptoData) {
       this.tickers = JSON.parse(cryptoData);
+
+      this.tickers.forEach((ticker) => {
+        subcribeOnUpdates(ticker.name, (name, price) => {
+          this.getUpdatedPricesOfTickers(name, price);
+        });
+      });
     }
-    setInterval(async () => {
-      await this.getUpdatedPricesOfTickers();
-      if (this.select && this.select.price !== "-") {
-        this.graphPrice.push(this.select.price);
-      }
-    }, 5000);
 
     let url = new URL(window.location.href);
     let params = new URLSearchParams(url.search);

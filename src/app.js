@@ -6,26 +6,8 @@ const API_KEY =
 const CRYPTOCOMPARE_URL = "https://min-api.cryptocompare.com/data/pricemulti";
 const COINLIST_URL = "https://min-api.cryptocompare.com/data/all/coinlist";
 
-export const getPricesOfTickers = (tickers) => {
-  return fetch(
-    CRYPTOCOMPARE_URL +
-      "?" +
-      new URLSearchParams({
-        fsyms: tickers.join(","),
-        tsyms: "USD",
-        api_key: API_KEY,
-      })
-  )
-    .then((response) => response.json())
-    .then((cryptocurrencies) =>
-      Object.fromEntries(
-        Object.entries(cryptocurrencies).map((currency) => [
-          currency[0],
-          currency[1].USD,
-        ])
-      )
-    );
-};
+//колекция тикеров и функций которые она выполняет
+const tickerHandlers = new Map(); // doge - () => {}
 
 export const getCoinlist = async () => {
   try {
@@ -37,3 +19,59 @@ export const getCoinlist = async () => {
     console.log(error);
   }
 };
+
+const loadPricesOfTickers = () => {
+  if (!tickerHandlers.size) return;
+
+  fetch(
+    CRYPTOCOMPARE_URL +
+      "?" +
+      new URLSearchParams({
+        fsyms: Array.from(tickerHandlers.keys()).join(","),
+        tsyms: "USD",
+        api_key: API_KEY,
+      })
+  )
+    .then((response) => response.json())
+    .then((cryptocurrencies) =>
+      Object.fromEntries(
+        Object.entries(cryptocurrencies).map(([currency, price]) => [
+          currency,
+          price.USD,
+        ])
+      )
+    )
+    .then((updatedPrices) => {
+      Object.entries(updatedPrices).forEach(([currency, newPrice]) => {
+        tickerHandlers.get(currency).forEach((fn) => fn(currency, newPrice));
+      });
+    });
+};
+
+// const getUpdatedPricesOfTickers = (updatedPrices) => {
+//   if (!updatedPrices) return;
+//   Object.entries(updatedPrices).forEach(([currency, newPrice]) => {
+//     tickerHandlers.get(currency).forEach((fn) => fn(currency, newPrice));
+//   });
+// };
+
+//мы получаем цены тикером
+//но наша ЗАДАЧА - получать ОБНОВЛЕНИЯ цен тикеров
+
+export const subcribeOnUpdates = (ticker, cb) => {
+  const subscribers = tickerHandlers.get(ticker) || [];
+  tickerHandlers.set(ticker, [...subscribers, cb]);
+};
+
+export const unsubcribeFromUpdates = (ticker) => {
+  tickerHandlers.delete(ticker);
+};
+
+// setInterval(async () => {
+//   const updatedPrices = await loadPricesOfTickers();
+//   getUpdatedPricesOfTickers(updatedPrices);
+// }, 50000000);
+
+setInterval(loadPricesOfTickers, 50000000);
+
+window.tickers = tickerHandlers;
