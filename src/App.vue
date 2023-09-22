@@ -151,8 +151,7 @@
 import SvgIcon from "@jamescoyle/vue-icon";
 import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
 
-//import { loadtPricesOfTickers, getCoinlist, subcribeOnUpdates } from "./app";
-import { subcribeOnUpdates, getCoinlist, unsubcribeFromUpdates } from "./app";
+import { subscribeOnUpdates, getCoinlist, unsubscribeFromUpdates } from "./app";
 
 export default {
   name: "my-component",
@@ -290,7 +289,7 @@ export default {
       };
       this.tickers.push(newTicker);
 
-      subcribeOnUpdates(newTicker.name, (name, price) => {
+      subscribeOnUpdates(newTicker.name, (name, price) => {
         this.getUpdatedPricesOfTickers(name, price);
       });
 
@@ -298,19 +297,19 @@ export default {
     },
     getUpdatedPricesOfTickers(tickerName, newPrice) {
       this.tickers = this.tickers.map((ticker) => {
+        if (
+          this.select &&
+          ticker.name === tickerName &&
+          this.select.name === tickerName &&
+          ticker.price !== "-"
+        ) {
+          this.graphPrice.push(newPrice);
+        }
         if (ticker.name === tickerName) {
           return { name: ticker.name, price: newPrice };
         }
         return ticker;
       });
-
-      if (
-        this.select &&
-        this.select.name === tickerName &&
-        this.select.price !== "-"
-      ) {
-        this.graphPrice.push(newPrice);
-      }
     },
 
     formatPriceOfTicker(price) {
@@ -328,7 +327,7 @@ export default {
         (itemOfTickers) => itemOfTickers !== ticker
       );
 
-      unsubcribeFromUpdates(ticker.name);
+      unsubscribeFromUpdates(ticker.name);
 
       if (this.select?.name === ticker.name) {
         this.select = null;
@@ -351,7 +350,7 @@ export default {
       this.tickers = JSON.parse(cryptoData);
 
       this.tickers.forEach((ticker) => {
-        subcribeOnUpdates(ticker.name, (name, price) => {
+        subscribeOnUpdates(ticker.name, (name, price) => {
           this.getUpdatedPricesOfTickers(name, price);
         });
       });
