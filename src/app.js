@@ -6,10 +6,35 @@ const COINLIST_URL = "https://min-api.cryptocompare.com/data/all/coinlist";
 const WS_URL = `wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}`;
 const AGREGATE_INDEX = "5";
 
+const tickerHandlers = new Map();
+
 const socket = new WebSocket(WS_URL);
 
+const bc = new BroadcastChannel("multitab-forws");
+
+let multiTabs = false;
+
+//создать мультиоконность
+
+window.addEventListener("load", function () {
+  const tabs = localStorage.getItem("tabs");
+
+  if (!tabs && window.name === "") {
+    multiTabs = true;
+    localStorage.setItem("tabs", String(multiTabs));
+    window.name = "";
+  } else {
+    multiTabs = Number(tabs);
+    window.name = "DauhgterName";
+  }
+});
+
+bc.addEventListener("message", (event) => {
+  const { FROMSYMBOL: currency, PRICE: tickerPrice } = event.data;
+  updatePriceOfTickers(currency, tickerPrice);
+});
+
 //колекция тикеров и функций которые она выполняет
-const tickerHandlers = new Map();
 
 export const getCoinlist = async () => {
   try {
@@ -42,10 +67,12 @@ function sendToWs(message) {
 }
 
 function subscribeToUpdatesOnWs(ticker) {
+  if (window.name === "DaughterPage") return;
   sendToWs({ action: "SubAdd", subs: [`5~CCCAGG~${ticker}~USD`] });
 }
 
 function unsubscribeFromUpdatesOnWs(ticker) {
+  if (window.name === "DaughterPage") return;
   sendToWs({ action: "SubRemove", subs: [`5~CCCAGG~${ticker}~USD`] });
 }
 
@@ -62,7 +89,13 @@ export const unsubscribeFromUpdates = (ticker) => {
   unsubscribeFromUpdatesOnWs(ticker);
 };
 
+function updatePriceOfTickers(currency, price) {
+  tickerHandlers.get(currency).forEach((fn) => fn(currency, price));
+}
+
 socket.addEventListener("message", function (message) {
+  if (window.name === "DaughterPage") return;
+
   const {
     TYPE: type,
     FROMSYMBOL: currency,
@@ -70,7 +103,8 @@ socket.addEventListener("message", function (message) {
   } = JSON.parse(message.data);
 
   if (type !== AGREGATE_INDEX || !tickerPrice) return;
-  tickerHandlers.get(currency).forEach((fn) => fn(currency, tickerPrice));
+  bc.postMessage({ FROMSYMBOL: currency, PRICE: tickerPrice });
+  updatePriceOfTickers(currency, tickerPrice);
 });
 
 window.tickers = tickerHandlers;

@@ -1,48 +1,52 @@
 <template>
   <div class="wrapper">
-    <div class="search">
-      <div class="content">
-        <div class="searchTicker">
-          <div class="searchTicker-title">Тикер</div>
-          <div class="searchTicker-content">
-            <input
-              v-model="ticker"
-              type="text"
-              class="searchTicker-input"
-              placeholder="Например DOGE"
-              @keyup.enter="addTicker(ticker)"
-            />
-            <div
-              v-if="filteredArrOfCoinList.length && ticker"
-              class="searchTicker-hints"
-            >
+    <div class="nav">
+      <div class="search">
+        <div class="content">
+          <div class="searchTicker">
+            <div class="searchTicker-title">Тикер</div>
+            <div class="searchTicker-content">
+              <input
+                v-model="ticker"
+                type="text"
+                class="searchTicker-input"
+                placeholder="Например DOGE"
+                @keyup.enter="addTicker(ticker)"
+              />
               <div
-                v-for="(coin, idx) in filteredArrOfCoinList"
-                :key="idx"
-                @click="addTicker(coin)"
+                v-if="filteredArrOfCoinList.length && ticker"
+                class="searchTicker-hints"
               >
-                {{ coin }}
+                <div
+                  v-for="(coin, idx) in filteredArrOfCoinList"
+                  :key="idx"
+                  @click="addTicker(coin)"
+                >
+                  {{ coin }}
+                </div>
+              </div>
+              <div
+                v-for="(error, idx) in inputTickerError"
+                :key="idx"
+                class="searchTicker-validation"
+              >
+                {{ error }}
               </div>
             </div>
-            <div
-              v-for="(error, idx) in inputTickerError"
-              :key="idx"
-              class="searchTicker-validation"
-            >
-              {{ error }}
+            <div>
+              <button
+                class="searchTicker-button"
+                @click.enter="addTicker(ticker)"
+              >
+                <svg-icon type="mdi" :path="add" class="icon"></svg-icon>
+                <div class="stButton-text">Добавить</div>
+              </button>
             </div>
-          </div>
-          <div>
-            <button
-              class="searchTicker-button"
-              @click.enter="addTicker(ticker)"
-            >
-              <svg-icon type="mdi" :path="add" class="icon"></svg-icon>
-              <div class="stButton-text">Добавить</div>
-            </button>
           </div>
         </div>
       </div>
+
+      <custom-drop-down :balance="balance"></custom-drop-down>
     </div>
 
     <div class="filters">
@@ -153,10 +157,13 @@ import { mdiPlus, mdiTrashCan, mdiWindowClose } from "@mdi/js";
 
 import { subscribeOnUpdates, getCoinlist, unsubscribeFromUpdates } from "./app";
 
+import customDropDown from "./components/customDropDown.vue";
+
 export default {
   name: "my-component",
   components: {
     SvgIcon,
+    customDropDown,
   },
 
   data() {
@@ -173,6 +180,12 @@ export default {
       add: mdiPlus,
       delete_: mdiTrashCan,
       close: mdiWindowClose,
+      balance: {
+        account: 0.2,
+        withdrawal: 5.243,
+        bonuses: 4.234,
+        left: 5.5678,
+      },
     };
   },
   watch: {
@@ -374,8 +387,12 @@ export default {
 <style lang="scss" scopped>
 .wrapper {
 }
-.search {
+.nav {
+  display: flex;
+  justify-content: space-between;
   margin: 25px 0 0 0;
+}
+.search {
 }
 .searchTicker {
   display: flex;
